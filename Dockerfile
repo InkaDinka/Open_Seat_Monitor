@@ -7,6 +7,13 @@ ENV PYTHONUNBUFFERED 1
 #Avoids creation of .pyc files to filesystem.
 ENV PYTHONDONTWRITEBYTECODE 1
 
+#Run commands needed to create chrome instances so chrome.exe is not needed in working directory. 
+RUN apt-get update
+
+RUN apt-get install -y chromium
+
+RUN apt-get install -y chromium-driver
+
 #Sets path of container to host the other commands.
 WORKDIR /app
 
