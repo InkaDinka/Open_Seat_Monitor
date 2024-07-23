@@ -1,6 +1,3 @@
 /__pycache__
 /.env
-/.vscode
 /instance
-/chrome.exe
-/users.sqlite3
