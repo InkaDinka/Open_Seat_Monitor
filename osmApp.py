@@ -14,6 +14,7 @@ from selenium.webdriver.chrome.options import Options
 from flask import Flask, render_template, request, Response
 from flask_sqlalchemy import SQLAlchemy
 import os
+import requests
 
 app = Flask(__name__)
 
@@ -43,7 +44,7 @@ class User(db.Model):
         self.term = term
 
 
-def monitor():
+def monitor(driver):
     #Function that takes a chrome driver and form submission info from sqlite database for unique class search link for monitoring.
     def get_page_content(classNum, term, driver):
 
@@ -87,20 +88,13 @@ def monitor():
         else:
             return None, None
 
-    #Options that are needed to hide third-party cookie log messages and to use the chrome driver in tabless.
-    chrome_options = Options()
-    chrome_options.add_argument('--headless')
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--log-level=3')
-
-    driver = webdriver.Chrome(options=chrome_options)
-
     load_dotenv()
 
     #Monitoring loop
 
     #Current context of webpage and contents in database.
     with app.app_context():
+        session = db.session()
         term_dict = {
             "Fall 2024": 2247,
             "Spring 2025": 2251,
@@ -125,7 +119,7 @@ def monitor():
                 #Grabs initial seats to monitor.
                 user.initialSeats, _ = get_page_content(classNum, term_dict.get(user.term), driver)
                 #Commits initial seats to databasae.
-                db.session.commit()
+                session.commit()
 
             #Searches current seats that will be compared to the inital seats of current user.
             current_seats, class_name = get_page_content(classNum, term_dict.get(user.term), driver)
@@ -167,13 +161,21 @@ def monitor():
 
 
         #Changes will be applied to the database.
-        db.session.commit()
-        time.sleep(3)
-            
-    driver.quit()
+        session.commit()
+        session.close()
+        #Decreases CPU usage from APScheduler
+        time.sleep(1)
+
+#Options that are needed to hide third-party cookie log messages and to use the chrome driver in tabless.
+chrome_options = Options()
+chrome_options.add_argument('--headless')
+chrome_options.add_argument('--no-sandbox')
+chrome_options.add_argument('--log-level=3')
+
+driver = webdriver.Chrome(options=chrome_options)
 
 scheduler = BackgroundScheduler()
-scheduler.add_job(monitor, 'interval', seconds=15)
+scheduler.add_job(monitor, 'interval', seconds=30, args=[driver])
 scheduler.start()
 
 #Root route that gets information from the submitted form and creates new users in the sql database.
@@ -245,6 +247,7 @@ if __name__ == '__main__':
         db.create_all()
 #Set debug to true so server doesn't need to be executed with every change.
     try:
-        app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)), debug=True)
+        app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
     except(KeyboardInterrupt, SystemExit):
+        driver.quit()
         scheduler.shutdown()
