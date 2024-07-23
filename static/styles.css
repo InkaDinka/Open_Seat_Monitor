@@ -1,0 +1,114 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+/* Defines font and bg color of entire website. */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #252525;
+}
+/* About header */
+.header {
+    padding: 1px 15px;
+    color: #c0c0c0;
+    margin: 0;
+}
+/* Form headers */
+.submissionheader {
+    padding: 15px 1px;
+    color: #c0c0c0;
+    margin: 0;
+}
+
+.paragraph {
+    padding: 15px;
+    color: #c0c0c0;
+    line-height: 2;
+}
+/* Style for term label in submission form */
+.labels {
+    padding: 15px;
+    color: #c0c0c0;
+    font: 18px Arial;
+}
+/* Navigation bar */
+.navbar {
+    display: flex;
+    justify-content: left;
+    align-items: center;
+    margin: 2;
+    padding: 15px 20px;
+    color: #fff;
+    background-color: rgb(49, 49, 49);
+    border-radius: 16px;
+}
+/* Navigation bar logo (Open Seat Monitor) */
+.logo {
+    font-size: 1.5em;
+    font-weight: bold;
+    text-shadow: 6px 4px 4px #5c5c5c;
+}
+/* Formats the navigation bar list */
+.nav-links {
+    list-style: none;
+    display: flex;
+}
+
+.nav-links li {
+    margin-left: 30px;
+}
+
+.nav-links a {
+    color: #fff;
+    text-decoration: none;
+    font-size: 1em;
+}
+
+.nav-item {
+    padding: 12px;
+}
+/* Sets animation for hypherlinks in navbar */
+.nav-item:hover {
+    background-color: rgb(102, 67, 119);
+    border-radius: 8px;
+    transition: color 1s ease,
+    background-color 1s ease
+}
+.formatform {
+    display: inline;
+    justify-content: center;
+}
+.form {
+    margin: 20px 200px
+}
+input {
+    border: 1px solid transparent;
+    padding: 10px;
+    font-size: 16px;
+}
+/* color sets the color of input */
+input[type="text"] {
+    background-color: #5c5c5c;
+    width: 100%;
+    color: lightgray;
+}
+input[type="email"] {
+    background-color: #5c5c5c;
+    width: 100%;
+    color: lightgray;
+}
+/* Changes color of text in inputs */
+::placeholder {
+    color: #c0c0c0;
+}
+.select {
+    background-color: #5c5c5c;
+    width: 10%;
+    color: #c0c0c0;
+}
+
+input[type="submit"] {
+    background-color: rgb(102, 67, 119);
+    color: #fff;
+}

@@ -1,0 +1,32 @@
+services:
+#web is the name of the service or job.
+  web:
+    build:
+#builds a docker image in the found docker file in the current directory.
+      context: .
+      dockerfile: Dockerfile
+    #Environment variables from secrets for script access.
+    environment:
+      - MASS_EMAIL=${MASS_EMAIL}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+#Maps current directory to /app in docker file container.
+    volumes: 
+      - .:/app
+#Command to run when running docker image.
+    command: python osmApp.py
+
+
+
+#To see all current images:
+#docker image ls
+
+#To see all containers:
+#docker ps -a
+
+#Tag images with locations to push to google cloud:
+
+#docker tag openseatmonitordeploy-background:latest gcr.io/openseatmonitor/openseatmonitordeploy-background:latest
+#docker tag openseatmonitordeploy-web:latest gcr.io/openseatmonitor/openseatmonitordeploy-web:latest
+
+#Push image to google cloud artifact registry
+#docker push gcr.io/openseatmonitor/openseatmonitordeploy-background:latest
