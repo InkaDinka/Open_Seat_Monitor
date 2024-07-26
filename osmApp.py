@@ -15,6 +15,7 @@ from flask import Flask, render_template, request, Response
 from flask_sqlalchemy import SQLAlchemy
 import os
 import requests
+import re
 
 app = Flask(__name__)
 
@@ -24,73 +25,78 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
 
+load_dotenv()
+
+#Association table for when a single email has multiple classes.
+association_table = db.Table('user_class', 
+    db.Column('user_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
+    db.Column('class_id', db.Integer, db.ForeignKey('classes.id'), primary_key=True)
+)
+
 #Class for creating a new user.
 class User(db.Model):
-#Creates columns in database for each attribute.
+    __tablename__ = 'users'
+    #Unique id for each user
+    id = db.Column("id", db.Integer, primary_key=True)
+    
+    #Class and user information
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    classes = db.relationship('Class', secondary=association_table, backref=db.backref('users', lazy='dynamic'))
 
-#Unique id for each user
-    _id = db.Column("id", db.Integer, primary_key=True)
-#Class and user information
+class Class(db.Model):
+    __tablename__ = 'classes'
+    id = db.Column("id", db.Integer, primary_key=True)
     classNum = db.Column(db.Integer)
-    email = db.Column(db.String(100))
     initialSeats = db.Column(db.Integer, nullable=True, default=None)
     term = db.Column(db.String(20))
-
-#Constructor do build objects with passed parameters.
-    def __init__(self, classNum, email, initialSeats, term):
-        self.classNum = classNum
-        self.email = email
-        self.initialSeats = initialSeats
-        self.term = term
-
 
 def monitor(driver):
     #Function that takes a chrome driver and form submission info from sqlite database for unique class search link for monitoring.
     def get_page_content(classNum, term, driver):
 
         url = f'https://catalog.apps.asu.edu/catalog/classes/classlist?advanced=true&campusOrOnlineSelection=A&classNbr={classNum}&honors=F&promod=F&searchType=all&term={term}'
-        
+
         driver.get(url)
 
-        element = 0
-        #Stores all 6 text-nowrap tags on the site in a list.
-        while element < 6:
-            for trial in range(200):
-                try:
-                    wait = WebDriverWait(driver, 30)
-                    elements = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'text-nowrap')))
-                    element += 1
-                except:
-                    time.sleep(1)
-
-        word = ""
         open_seats = None
+        
+        try:
+            # Gives driver wait time for elements on webpage to be found and for page to load
+            driver.implicitly_wait(1)
+            
+            #Finds elements under a tree of html tags and puts all elements under that tree in a list
+            elements = driver.find_elements(By.XPATH, f"/html/body/div[2]/div[2]/div[2]/div/div/div[5]/div/div/div/div[2]")
 
-        #Searches for the tag containing the open seat information.
-        for element in elements:
-            data = element.text.strip() 
-            if ' of ' in data:  
-                #If text-nowrap tag with open seat information is found build a string of the open seat number until a space is reached which will result in a ValueError.
-                for character in data:
-                    try:
-                        number = int(character)
-                        word += str(number)
-                    except ValueError:
-                        break 
-                open_seats = int(word)
-        #Scans for bold-hypherlink tag to find class name
-        waits = WebDriverWait(driver, 30)
-        span_elements = waits.until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'bold-hyperlink')))
-        class_name = span_elements[2].text
+        except:
+            open_seats = None
+
+        #Filters the elements list for the open_seats. Ex) 8 of 54 - returns 8
+        if elements:
+            for ele in elements:
+                data = ele.text.strip()
+                seat_element = re.findall(r'(\d+ of \d+)', data)
+                print(seat_element[0])
+                if data:
+                    open_seats = int(str(seat_element[0])[0:seat_element[0].find(" ")])
+
+        try:
+            #Scans for bold-hypherlink tag to find class name
+            waits = WebDriverWait(driver, 30)
+            span_elements = waits.until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'bold-hyperlink')))
+            class_name = span_elements[2].text
+
+        except Exception as e:
+            print(f"Retrying... {e}")
+            import traceback
+            traceback.print_exc()
+            time.sleep(1)
+            
 
         if open_seats != None and class_name != None:
+            
             return open_seats, class_name
         else:
             return None, None
-
-    load_dotenv()
-
-    #Monitoring loop
 
     #Current context of webpage and contents in database.
     with app.app_context():
@@ -106,65 +112,68 @@ def monitor(driver):
         }
         try:
             #Collects all users in the database in a list
-            full_users = User.query.all()
+            classes = Class.query.all()
         except Exception as e:
             print(f"An error occurred: {e}")
             import traceback
             traceback.print_exc()
         #Each users' class will be scraped for the open seats using get_page_content which passes the inputted class information from the database.
-        for user in full_users:
-            receiver_email = user.email
-            classNum = int(user.classNum)
-            if user.initialSeats == None:
+        for cls in classes:
+            receiver_emails = [user.email for user in cls.users]
+            classNum = int(cls.classNum)
+            if cls.initialSeats == None:
                 #Grabs initial seats to monitor.
-                user.initialSeats, _ = get_page_content(classNum, term_dict.get(user.term), driver)
+                cls.initialSeats, _ = get_page_content(classNum, term_dict.get(cls.term), driver)
                 #Commits initial seats to databasae.
                 session.commit()
 
             #Searches current seats that will be compared to the inital seats of current user.
-            current_seats, class_name = get_page_content(classNum, term_dict.get(user.term), driver)
+            current_seats, class_name = get_page_content(classNum, term_dict.get(cls.term), driver)
 
             if current_seats == None or class_name == None:
-                print(f"Class {user.classNum} not found\n")
+                print(f"Class {cls.classNum} not found\n")
                 continue
 
             # print(f"Class Name: {class_name}   -   Email: {user.email}   -   Class Number: {user.classNum}   -   Initial Seats: {user.initialSeats}   -   Term: {user.term}\n")
 
             #Checks for changes in the seats available and if there's a change an email is sent.
-            if int(current_seats) != int(user.initialSeats):
-
-                #Email credentials are fetched from github repository secrets.
-                sender_email = os.getenv('MASS_EMAIL')
-                password = os.getenv('EMAIL_PASSWORD')
-
-                message = MIMEMultipart()
-                message['From'] = sender_email
-                message['To'] = receiver_email
-                message['Subject'] = f'Seat(s) Available: {class_name}'
-
-                body = f'\nNumber of seats available: {current_seats}'
-                message.attach(MIMEText(body, 'plain'))
-
-                try:
-                #587 is the port number for the SMTP (Simple Mail Transfer Protocol) server.
-                    with smtplib.SMTP('smtp.gmail.com', 587) as server:  
-                        server.starttls()
-                        server.login(sender_email, password)
-                        server.sendmail(sender_email, receiver_email, message.as_string())
-                        initial_seats = current_seats
-
-                except Exception as e:
-                    print(f'Failed to send email: {e}')
-                    time.sleep(15)
+            if int(current_seats) != int(cls.initialSeats):
+                email_users(receiver_emails, class_name, current_seats)
                 #Updates the initial seats to current seats in the database.
-                user.initialSeats = int(current_seats)
-
+                cls.initialSeats = int(current_seats)
 
         #Changes will be applied to the database.
         session.commit()
         session.close()
         #Decreases CPU usage from APScheduler
         time.sleep(1)
+
+
+def email_users(reciever_emails, class_name, current_seats):
+    with app.app_context():
+        for receiver_email in reciever_emails:
+            sender_email = os.getenv('MASS_EMAIL')
+            password = os.getenv('EMAIL_PASSWORD')
+
+            message = MIMEMultipart()
+            message['From'] = sender_email
+            message['To'] = receiver_email
+            message['Subject'] = f'Seat(s) Available: {class_name}'
+
+            body = f'\nNumber of seats available: {current_seats}'
+            message.attach(MIMEText(body, 'plain'))
+
+            try:
+            #587 is the port number for the SMTP (Simple Mail Transfer Protocol) server.
+                with smtplib.SMTP('smtp.gmail.com', 587) as server:  
+                    server.starttls()
+                    server.login(sender_email, password)
+                    server.sendmail(sender_email, receiver_email, message.as_string())
+                    initial_seats = current_seats
+
+            except Exception as e:
+                print(f'Failed to send email: {e}')
+                time.sleep(2)
 
 #Options that are needed to hide third-party cookie log messages and to use the chrome driver in tabless.
 chrome_options = Options()
@@ -175,7 +184,7 @@ chrome_options.add_argument('--log-level=3')
 driver = webdriver.Chrome(options=chrome_options)
 
 scheduler = BackgroundScheduler()
-scheduler.add_job(monitor, 'interval', seconds=30, args=[driver])
+scheduler.add_job(monitor, 'interval', seconds=10, args=[driver])
 scheduler.start()
 
 #Root route that gets information from the submitted form and creates new users in the sql database.
@@ -191,50 +200,95 @@ def webpage():
 
         if email and classNum:
             if 'submit' in request.form:
-                new_user = User(email=email, classNum=classNum, term=term, initialSeats=None)
-                db.session.add(new_user)
+                #[user.email for user in cls.users]
+                user = User.query.filter_by(email=email).first()
+            
+                # If the user does not exist, create a new user
+                if not user:
+                    user = User(email=email)
+                    db.session.add(user)
+
+                # Check if the class exists
+                cls = Class.query.filter_by(classNum=classNum).first()
+                
+                # If the class does not exist, create a new class
+                if not cls:
+                    cls = Class(classNum=classNum, term=term, initialSeats=None)
+                    db.session.add(cls)
+
+                # Add the class to the user if not already added
+                if cls not in user.classes:
+                    user.classes.append(cls)
+
+                # Commit the changes
                 db.session.commit()
+
             elif 'remove' in request.form:
-#Filters database to find the first user that matches submitted email and class number and deletes that user from the database.
-                user = User.query.filter_by(email=email, classNum=classNum).first()
+                #Filters database to find the first user that matches submitted email and class number and deletes that user from the database.
+                user = User.query.filter_by(email=email).first()
                 if user:
+                    # Remove all classes associated with this user
+                    user.classes = []
                     db.session.delete(user)
                     db.session.commit()
-#Responds with the same html containing the form for more user submissions.
+    #Responds with the same html containing the form for more user submissions.
     return render_template('index.html')
 
 #Route to view users and classes being monitored        
 @app.route('/users', methods=['GET'])
-def get_current_courses():
- 
+def get_users():
     users = User.query.all()
+    classes = Class.query.all()
 
-#Sets table colors and table headers.
     table = """
     <table bgcolor="grey" width="1000"; border-collapse: collapse;" align="center" >
         <thead>
             <tr bgcolor="lightgrey" align="center">
                 <th>Email</th>
                 <th>Class Number</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+
+    for user in users:
+        classNum = ', '.join(str(cls.classNum) for cls in user.classes)
+        table += f"""
+        <tr bgcolor="lightblue" align="center">
+            <td>{user.email}</td>
+            <td>{classNum}</td>
+        </tr>
+        """
+#Once all users are added close table body and table tags
+    table += """
+        </tbody>
+    </table>
+    """
+
+    table += """
+    <table bgcolor="grey" width="1000"; border-collapse: collapse;" align="center" >
+        <thead>
+            <tr bgcolor="lightgrey" align="center">
+                <th>Class Number</th>
                 <th>Initial Seats</th>
+                <th>Associated Emails</th>
                 <th>Term</th>
             </tr>
         </thead>
         <tbody>
     """
 
-#Add table rows for each user to display
-    for user in users:
+    for cls in classes:
+        associated_emails = cls.users.count()
         table += f"""
-        <tr bgcolor="lightblue" align="center">
-            <td>{user.email}</td>
-            <td>{user.classNum}</td>
-            <td>{user.initialSeats}</td>
-            <td>{user.term}</td>
+        <br><tr bgcolor="lightblue" align="center">
+            <td>{cls.classNum}</td>
+            <td>{cls.initialSeats}</td>
+            <td>{associated_emails}</td>
+            <td>{cls.term}</td>
         </tr>
         """
-
-#Once all users are added close table body and table tags
+    #Once all users are added close table body and table tags
     table += """
         </tbody>
     </table>
@@ -242,10 +296,11 @@ def get_current_courses():
     return Response(table, content_type='text/html')
 
 if __name__ == '__main__':
-#Creates instance of database in current flask context. 
+    #Creates instance of database in current flask context. 
     with app.app_context():
+        db.drop_all()
         db.create_all()
-#Set debug to true so server doesn't need to be executed with every change.
+    #Set debug to true so server doesn't need to be executed with every change.
     try:
         app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
     except(KeyboardInterrupt, SystemExit):
