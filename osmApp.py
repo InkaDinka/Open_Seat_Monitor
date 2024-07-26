@@ -15,6 +15,7 @@ from flask import Flask, render_template, request, Response
 from flask_sqlalchemy import SQLAlchemy
 import os
 import requests
+import re
 
 app = Flask(__name__)
 
@@ -35,10 +36,11 @@ association_table = db.Table('user_class',
 #Class for creating a new user.
 class User(db.Model):
     __tablename__ = 'users'
-#Unique id for each user
+    #Unique id for each user
     id = db.Column("id", db.Integer, primary_key=True)
-#Class and user information
-    email = db.Column(db.String(100))
+    
+    #Class and user information
+    email = db.Column(db.String(100), unique=True, nullable=False)
     classes = db.relationship('Class', secondary=association_table, backref=db.backref('users', lazy='dynamic'))
 
 class Class(db.Model):
@@ -53,46 +55,48 @@ def monitor(driver):
     def get_page_content(classNum, term, driver):
 
         url = f'https://catalog.apps.asu.edu/catalog/classes/classlist?advanced=true&campusOrOnlineSelection=A&classNbr={classNum}&honors=F&promod=F&searchType=all&term={term}'
-        
+
         driver.get(url)
 
-        element = 0
-        #Stores all 6 text-nowrap tags on the site in a list.
-        while element < 6:
-            for trial in range(200):
-                try:
-                    wait = WebDriverWait(driver, 30)
-                    elements = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'text-nowrap')))
-                    element += 1
-                except:
-                    time.sleep(1)
-
-        word = ""
         open_seats = None
+        
+        try:
+            # Gives driver wait time for elements on webpage to be found and for page to load
+            driver.implicitly_wait(1)
+            
+            #Finds elements under a tree of html tags and puts all elements under that tree in a list
+            elements = driver.find_elements(By.XPATH, f"/html/body/div[2]/div[2]/div[2]/div/div/div[5]/div/div/div/div[2]")
 
-        #Searches for the tag containing the open seat information.
-        for element in elements:
-            data = element.text.strip() 
-            if ' of ' in data:  
-                #If text-nowrap tag with open seat information is found build a string of the open seat number until a space is reached which will result in a ValueError.
-                for character in data:
-                    try:
-                        number = int(character)
-                        word += str(number)
-                    except ValueError:
-                        break 
-                open_seats = int(word)
-        #Scans for bold-hypherlink tag to find class name
-        waits = WebDriverWait(driver, 30)
-        span_elements = waits.until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'bold-hyperlink')))
-        class_name = span_elements[2].text
+        except:
+            open_seats = None
+
+        #Filters the elements list for the open_seats. Ex) 8 of 54 - returns 8
+        if elements:
+            for ele in elements:
+                data = ele.text.strip()
+                seat_element = re.findall(r'(\d+ of \d+)', data)
+                print(seat_element[0])
+                if data:
+                    open_seats = int(str(seat_element[0])[0:seat_element[0].find(" ")])
+
+        try:
+            #Scans for bold-hypherlink tag to find class name
+            waits = WebDriverWait(driver, 30)
+            span_elements = waits.until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'bold-hyperlink')))
+            class_name = span_elements[2].text
+
+        except Exception as e:
+            print(f"Retrying... {e}")
+            import traceback
+            traceback.print_exc()
+            time.sleep(1)
+            
 
         if open_seats != None and class_name != None:
+            
             return open_seats, class_name
         else:
             return None, None
-
-    #Monitoring loop
 
     #Current context of webpage and contents in database.
     with app.app_context():
@@ -180,7 +184,7 @@ chrome_options.add_argument('--log-level=3')
 driver = webdriver.Chrome(options=chrome_options)
 
 scheduler = BackgroundScheduler()
-scheduler.add_job(monitor, 'interval', seconds=30, args=[driver])
+scheduler.add_job(monitor, 'interval', seconds=10, args=[driver])
 scheduler.start()
 
 #Root route that gets information from the submitted form and creates new users in the sql database.
@@ -197,26 +201,37 @@ def webpage():
         if email and classNum:
             if 'submit' in request.form:
                 #[user.email for user in cls.users]
-                exists = User.query.filter_by(email=email).first()
-                #FIXME add new user in login route then the user can add classes to the same user.
-                if(exists != None):
-                    cls = Class.query.filter_by(classNum=classNum).first()
-                    cls.users.append(exists)
+                user = User.query.filter_by(email=email).first()
             
-                elif(exists == None):
-                    new_user = User(email=email)
-                    new_class = Class(classNum=classNum, term=term, initialSeats=None)
-                    new_user.classes.append(new_class)
-                    db.session.add(new_user)
+                # If the user does not exist, create a new user
+                if not user:
+                    user = User(email=email)
+                    db.session.add(user)
 
+                # Check if the class exists
+                cls = Class.query.filter_by(classNum=classNum).first()
+                
+                # If the class does not exist, create a new class
+                if not cls:
+                    cls = Class(classNum=classNum, term=term, initialSeats=None)
+                    db.session.add(cls)
+
+                # Add the class to the user if not already added
+                if cls not in user.classes:
+                    user.classes.append(cls)
+
+                # Commit the changes
                 db.session.commit()
+
             elif 'remove' in request.form:
-#Filters database to find the first user that matches submitted email and class number and deletes that user from the database.
+                #Filters database to find the first user that matches submitted email and class number and deletes that user from the database.
                 user = User.query.filter_by(email=email).first()
                 if user:
+                    # Remove all classes associated with this user
+                    user.classes = []
                     db.session.delete(user)
                     db.session.commit()
-#Responds with the same html containing the form for more user submissions.
+    #Responds with the same html containing the form for more user submissions.
     return render_template('index.html')
 
 #Route to view users and classes being monitored        
@@ -273,7 +288,7 @@ def get_users():
             <td>{cls.term}</td>
         </tr>
         """
-#Once all users are added close table body and table tags
+    #Once all users are added close table body and table tags
     table += """
         </tbody>
     </table>
@@ -281,11 +296,11 @@ def get_users():
     return Response(table, content_type='text/html')
 
 if __name__ == '__main__':
-#Creates instance of database in current flask context. 
+    #Creates instance of database in current flask context. 
     with app.app_context():
         db.drop_all()
         db.create_all()
-#Set debug to true so server doesn't need to be executed with every change.
+    #Set debug to true so server doesn't need to be executed with every change.
     try:
         app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
     except(KeyboardInterrupt, SystemExit):
