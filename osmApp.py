@@ -24,25 +24,29 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
 
+load_dotenv()
+
+#Association table for when a single email has multiple classes.
+association_table = db.Table('user_class', 
+    db.Column('user_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
+    db.Column('class_id', db.Integer, db.ForeignKey('classes.id'), primary_key=True)
+)
+
 #Class for creating a new user.
 class User(db.Model):
-#Creates columns in database for each attribute.
-
+    __tablename__ = 'users'
 #Unique id for each user
-    _id = db.Column("id", db.Integer, primary_key=True)
+    id = db.Column("id", db.Integer, primary_key=True)
 #Class and user information
-    classNum = db.Column(db.Integer)
     email = db.Column(db.String(100))
+    classes = db.relationship('Class', secondary=association_table, backref=db.backref('users', lazy='dynamic'))
+
+class Class(db.Model):
+    __tablename__ = 'classes'
+    id = db.Column("id", db.Integer, primary_key=True)
+    classNum = db.Column(db.Integer)
     initialSeats = db.Column(db.Integer, nullable=True, default=None)
     term = db.Column(db.String(20))
-
-#Constructor do build objects with passed parameters.
-    def __init__(self, classNum, email, initialSeats, term):
-        self.classNum = classNum
-        self.email = email
-        self.initialSeats = initialSeats
-        self.term = term
-
 
 def monitor(driver):
     #Function that takes a chrome driver and form submission info from sqlite database for unique class search link for monitoring.
@@ -88,8 +92,6 @@ def monitor(driver):
         else:
             return None, None
 
-    load_dotenv()
-
     #Monitoring loop
 
     #Current context of webpage and contents in database.
@@ -106,65 +108,68 @@ def monitor(driver):
         }
         try:
             #Collects all users in the database in a list
-            full_users = User.query.all()
+            classes = Class.query.all()
         except Exception as e:
             print(f"An error occurred: {e}")
             import traceback
             traceback.print_exc()
         #Each users' class will be scraped for the open seats using get_page_content which passes the inputted class information from the database.
-        for user in full_users:
-            receiver_email = user.email
-            classNum = int(user.classNum)
-            if user.initialSeats == None:
+        for cls in classes:
+            receiver_emails = [user.email for user in cls.users]
+            classNum = int(cls.classNum)
+            if cls.initialSeats == None:
                 #Grabs initial seats to monitor.
-                user.initialSeats, _ = get_page_content(classNum, term_dict.get(user.term), driver)
+                cls.initialSeats, _ = get_page_content(classNum, term_dict.get(cls.term), driver)
                 #Commits initial seats to databasae.
                 session.commit()
 
             #Searches current seats that will be compared to the inital seats of current user.
-            current_seats, class_name = get_page_content(classNum, term_dict.get(user.term), driver)
+            current_seats, class_name = get_page_content(classNum, term_dict.get(cls.term), driver)
 
             if current_seats == None or class_name == None:
-                print(f"Class {user.classNum} not found\n")
+                print(f"Class {cls.classNum} not found\n")
                 continue
 
             # print(f"Class Name: {class_name}   -   Email: {user.email}   -   Class Number: {user.classNum}   -   Initial Seats: {user.initialSeats}   -   Term: {user.term}\n")
 
             #Checks for changes in the seats available and if there's a change an email is sent.
-            if int(current_seats) != int(user.initialSeats):
-
-                #Email credentials are fetched from github repository secrets.
-                sender_email = os.getenv('MASS_EMAIL')
-                password = os.getenv('EMAIL_PASSWORD')
-
-                message = MIMEMultipart()
-                message['From'] = sender_email
-                message['To'] = receiver_email
-                message['Subject'] = f'Seat(s) Available: {class_name}'
-
-                body = f'\nNumber of seats available: {current_seats}'
-                message.attach(MIMEText(body, 'plain'))
-
-                try:
-                #587 is the port number for the SMTP (Simple Mail Transfer Protocol) server.
-                    with smtplib.SMTP('smtp.gmail.com', 587) as server:  
-                        server.starttls()
-                        server.login(sender_email, password)
-                        server.sendmail(sender_email, receiver_email, message.as_string())
-                        initial_seats = current_seats
-
-                except Exception as e:
-                    print(f'Failed to send email: {e}')
-                    time.sleep(15)
+            if int(current_seats) != int(cls.initialSeats):
+                email_users(receiver_emails, class_name, current_seats)
                 #Updates the initial seats to current seats in the database.
-                user.initialSeats = int(current_seats)
-
+                cls.initialSeats = int(current_seats)
 
         #Changes will be applied to the database.
         session.commit()
         session.close()
         #Decreases CPU usage from APScheduler
         time.sleep(1)
+
+
+def email_users(reciever_emails, class_name, current_seats):
+    with app.app_context():
+        for receiver_email in reciever_emails:
+            sender_email = os.getenv('MASS_EMAIL')
+            password = os.getenv('EMAIL_PASSWORD')
+
+            message = MIMEMultipart()
+            message['From'] = sender_email
+            message['To'] = receiver_email
+            message['Subject'] = f'Seat(s) Available: {class_name}'
+
+            body = f'\nNumber of seats available: {current_seats}'
+            message.attach(MIMEText(body, 'plain'))
+
+            try:
+            #587 is the port number for the SMTP (Simple Mail Transfer Protocol) server.
+                with smtplib.SMTP('smtp.gmail.com', 587) as server:  
+                    server.starttls()
+                    server.login(sender_email, password)
+                    server.sendmail(sender_email, receiver_email, message.as_string())
+                    initial_seats = current_seats
+
+            except Exception as e:
+                print(f'Failed to send email: {e}')
+                time.sleep(2)
 
 #Options that are needed to hide third-party cookie log messages and to use the chrome driver in tabless.
 chrome_options = Options()
@@ -191,12 +196,23 @@ def webpage():
 
         if email and classNum:
             if 'submit' in request.form:
-                new_user = User(email=email, classNum=classNum, term=term, initialSeats=None)
-                db.session.add(new_user)
+                #[user.email for user in cls.users]
+                exists = User.query.filter_by(email=email).first()
+                #FIXME add new user in login route then the user can add classes to the same user.
+                if(exists != None):
+                    cls = Class.query.filter_by(classNum=classNum).first()
+                    cls.users.append(exists)
+            
+                elif(exists == None):
+                    new_user = User(email=email)
+                    new_class = Class(classNum=classNum, term=term, initialSeats=None)
+                    new_user.classes.append(new_class)
+                    db.session.add(new_user)
+
                 db.session.commit()
             elif 'remove' in request.form:
 #Filters database to find the first user that matches submitted email and class number and deletes that user from the database.
-                user = User.query.filter_by(email=email, classNum=classNum).first()
+                user = User.query.filter_by(email=email).first()
                 if user:
                     db.session.delete(user)
                     db.session.commit()
@@ -205,35 +221,58 @@ def webpage():
 
 #Route to view users and classes being monitored        
 @app.route('/users', methods=['GET'])
-def get_current_courses():
- 
+def get_users():
     users = User.query.all()
+    classes = Class.query.all()
 
-#Sets table colors and table headers.
     table = """
     <table bgcolor="grey" width="1000"; border-collapse: collapse;" align="center" >
         <thead>
             <tr bgcolor="lightgrey" align="center">
                 <th>Email</th>
                 <th>Class Number</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+
+    for user in users:
+        classNum = ', '.join(str(cls.classNum) for cls in user.classes)
+        table += f"""
+        <tr bgcolor="lightblue" align="center">
+            <td>{user.email}</td>
+            <td>{classNum}</td>
+        </tr>
+        """
+#Once all users are added close table body and table tags
+    table += """
+        </tbody>
+    </table>
+    """
+
+    table += """
+    <table bgcolor="grey" width="1000"; border-collapse: collapse;" align="center" >
+        <thead>
+            <tr bgcolor="lightgrey" align="center">
+                <th>Class Number</th>
                 <th>Initial Seats</th>
+                <th>Associated Emails</th>
                 <th>Term</th>
             </tr>
         </thead>
         <tbody>
     """
 
-#Add table rows for each user to display
-    for user in users:
+    for cls in classes:
+        associated_emails = cls.users.count()
         table += f"""
-        <tr bgcolor="lightblue" align="center">
-            <td>{user.email}</td>
-            <td>{user.classNum}</td>
-            <td>{user.initialSeats}</td>
-            <td>{user.term}</td>
+        <br><tr bgcolor="lightblue" align="center">
+            <td>{cls.classNum}</td>
+            <td>{cls.initialSeats}</td>
+            <td>{associated_emails}</td>
+            <td>{cls.term}</td>
         </tr>
         """
-
 #Once all users are added close table body and table tags
     table += """
         </tbody>
@@ -244,6 +283,7 @@ def get_current_courses():
 if __name__ == '__main__':
 #Creates instance of database in current flask context. 
     with app.app_context():
+        db.drop_all()
         db.create_all()
 #Set debug to true so server doesn't need to be executed with every change.
     try:
