@@ -51,7 +51,15 @@ class Class(db.Model):
     initialSeats = db.Column(db.Integer, nullable=True, default=None)
     term = db.Column(db.String(20))
 
-def monitor(driver):
+def monitor():
+
+    start_time = time.time()
+    chrome_options = Options()
+    chrome_options.add_argument('--headless')
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--log-level=3')
+
+    driver = webdriver.Chrome(options=chrome_options)
     #Function that takes a chrome driver and form submission info from sqlite database for unique class search link for monitoring.
     def get_page_content(classNum, term, driver):
 
@@ -146,8 +154,9 @@ def monitor(driver):
         #Changes will be applied to the database.
         session.commit()
         session.close()
+        driver.quit()
         #Decreases CPU usage from APScheduler
-        time.sleep(1)
+    print("Elapsed Time", (time.time() - start_time))
 
 
 def email_users(reciever_emails, class_name, current_seats):
@@ -176,16 +185,12 @@ def email_users(reciever_emails, class_name, current_seats):
                 print(f'Failed to send email: {e}')
                 time.sleep(2)
 
-#Options that are needed to hide third-party cookie log messages and to use the chrome driver in tabless.
-chrome_options = Options()
-chrome_options.add_argument('--headless')
-chrome_options.add_argument('--no-sandbox')
-chrome_options.add_argument('--log-level=3')
 
-driver = webdriver.Chrome(options=chrome_options)
-
+#Adds background process for monitoring classes where the function is called at an interval.
 scheduler = BackgroundScheduler()
-scheduler.add_job(monitor, 'interval', seconds=10, args=[driver])
+                                                    # args=[driver] (for if only one driver is used instead of creating a new one with each function call)
+#Creating a driver for each function call allows for multiple instances. The result is slower function run time but multiple instances of the function being called.
+scheduler.add_job(monitor, 'interval', seconds=30, max_instances=10)
 scheduler.start()
 
 #If user is not registered add them to the database
@@ -198,8 +203,9 @@ def login_user():
 
         if email and password:
             user_authenticate = User.query.filter_by(email=email).first()
-
+            #Cross checks hashed password and password entered in the form.
             if user_authenticate and check_password_hash(user_authenticate.password, password):
+                #Stores users email in session to be used when adding classes associated with that email.
                 session['user_email'] = email
                 return redirect(url_for('webpage'))
 
@@ -222,8 +228,10 @@ def registration():
         exists = User.query.filter_by(email=email).first()
         if exists:
             return render_template('register.html', user_exists=True)
-
+        
+        #If user exists and provided valid email/password add user to database.
         elif email and password:
+            #Hashes user password for safe storage.
             password_hash = generate_password_hash(password, method='pbkdf2:sha256')
 
             new_user = User(email=email, password=password_hash)
@@ -252,22 +260,24 @@ def webpage():
         classNum = request.form["Class Number"]
         term = request.form.get("term_select")
         
+        #If the user submitted a class and provided all info then check if user is already monitoring the class and if not append that class to that users associated classes.
         if request.form.get('submit') and term and classNum:
 
-            # Check if the class exists
+            #Needs no autoflush otherwise the query will not be compatible with the current session.
             with db.session.no_autoflush:
+                #Check if the class exists
                 cls = Class.query.filter_by(classNum=classNum).first()
             
-            # If the class does not exist, create a new class
-            if not cls:
+            #If the class does not exist, create a new class
+            if not cls and len(user.classes) < 3:
                 cls = Class(classNum=classNum, term=term, initialSeats=None)
                 db.session.add(cls)
 
-            # Add the class to the user if not already added
-            if cls not in user.classes:
+            #Add the class to the user if not already added
+            if cls not in user.classes and len(user.classes) < 3:
                 user.classes.append(cls)
 
-            # Commit the changes
+            #Commit the changes
             db.session.commit()
 
         elif request.form.get('remove') and classNum:
@@ -275,7 +285,7 @@ def webpage():
             with db.session.no_autoflush:
                 remove_cls = Class.query.filter_by(classNum=classNum).first()
 
-            # Remove all classes associated with this user
+            #Remove all classes associated with this user
             if remove_cls in user.classes:
                 user.classes.remove(remove_cls)
                 #If there are no emails associated with the class delete from db
@@ -358,5 +368,4 @@ if __name__ == '__main__':
     try:
         app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)), debug=True)
     except(KeyboardInterrupt, SystemExit):
-        driver.quit()
         scheduler.shutdown()
