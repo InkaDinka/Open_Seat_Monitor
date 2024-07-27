@@ -156,7 +156,6 @@ def monitor():
         session.close()
         driver.quit()
         #Decreases CPU usage from APScheduler
-    print("Elapsed Time", (time.time() - start_time))
 
 
 def email_users(reciever_emails, class_name, current_seats):
