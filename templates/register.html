@@ -21,12 +21,20 @@
                   </label>
                   <input type="password" id="password" name="password" placeholder="Enter your Password" required>
 
-                  <div class="wrap">
-                        <button type="submit"
-                                onclick="solve()">
+                  <div id=divsubmitbutton class="wrap">
+                        <!-- onclick="solve()" -->
+                        <button id="submitbutton" type="submit">
                               Submit
                         </button>
                   </div>
+
+                  {% if user_exists == True %}
+                  <p style="color: lightgray;">
+                        You Have an Account.
+                        <a style="color: rgb(150, 150, 150);"href="{{ url_for('login_user') }}">Login</a>
+                  </p>
+                  {% endif %}
+
             </form>
       </div>
 </body>

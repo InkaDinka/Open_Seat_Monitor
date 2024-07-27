@@ -214,14 +214,14 @@ def logout():
 @app.route('/register', methods=['GET', 'POST'])
 def registration():   
     if request.method == 'POST':
-    
+        #Gathers email and password from form data in POST request.
         email = request.form["email"]
         password = request.form["password"]
 
+        #Check if user that attempted to register exists in the database
         exists = User.query.filter_by(email=email).first()
-
         if exists:
-            return "User already exist"
+            return render_template('register.html', user_exists=True)
 
         elif email and password:
             password_hash = generate_password_hash(password, method='pbkdf2:sha256')
@@ -232,7 +232,8 @@ def registration():
 
             #url_for is the function name while render_template is the html file name
             return redirect(url_for('login_user'))
-    return render_template('register.html')
+  
+    return render_template('register.html', user_exists=False)
 
 #Root route that gets information from the submitted form and creates new users in the sql database.
 @app.route('/monitor', methods=['GET', 'POST'])
