@@ -11,21 +11,22 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
-from flask import Flask, render_template, request, Response
+from flask import Flask, render_template, request, Response, redirect, url_for, session
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 import os
-import requests
 import re
 
+load_dotenv()
+
 app = Flask(__name__)
+app.secret_key = "jf43jhfd9hf3u9hd93"
 
 #Creates a instance of the database in the working directory.
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.sqlite3'
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
-
-load_dotenv()
 
 #Association table for when a single email has multiple classes.
 association_table = db.Table('user_class', 
@@ -38,7 +39,7 @@ class User(db.Model):
     __tablename__ = 'users'
     #Unique id for each user
     id = db.Column("id", db.Integer, primary_key=True)
-    
+    password = db.Column(db.String(200), nullable=False)
     #Class and user information
     email = db.Column(db.String(100), unique=True, nullable=False)
     classes = db.relationship('Class', secondary=association_table, backref=db.backref('users', lazy='dynamic'))
@@ -75,7 +76,7 @@ def monitor(driver):
             for ele in elements:
                 data = ele.text.strip()
                 seat_element = re.findall(r'(\d+ of \d+)', data)
-                print(seat_element[0])
+
                 if data:
                     open_seats = int(str(seat_element[0])[0:seat_element[0].find(" ")])
 
@@ -187,26 +188,67 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(monitor, 'interval', seconds=10, args=[driver])
 scheduler.start()
 
-#Root route that gets information from the submitted form and creates new users in the sql database.
+#If user is not registered add them to the database
 @app.route('/', methods=['GET', 'POST'])
-def webpage():
+def login_user():
 
     if request.method == 'POST':
-
-#Fetches class and email info from the form submission
-        classNum = request.form["Class Number"]
         email = request.form["email"]
+        password = request.form["password"]
+
+        if email and password:
+            user_authenticate = User.query.filter_by(email=email).first()
+
+            if user_authenticate and check_password_hash(user_authenticate.password, password):
+                session['user_email'] = email
+                return redirect(url_for('webpage'))
+
+    return render_template('login.html') 
+
+#Root route to ask user to register or login if they already have an account
+@app.route('/register', methods=['GET', 'POST'])
+def registration():   
+    if request.method == 'POST':
+    
+        email = request.form["email"]
+        password = request.form["password"]
+
+        exists = User.query.filter_by(email=email).first()
+
+        if exists:
+            return "User already exist"
+
+        elif email and password:
+            password_hash = generate_password_hash(password, method='pbkdf2:sha256')
+
+            new_user = User(email=email, password=password_hash)
+            db.session.add(new_user)
+            db.session.commit()
+            print("User registered")
+
+            #url_for is the function name while render_template is the html file name
+            return redirect(url_for('login_user'))
+    return render_template('register.html')
+
+#Root route that gets information from the submitted form and creates new users in the sql database.
+@app.route('/monitor', methods=['GET', 'POST'])
+def webpage():
+    if 'user_email' not in session:
+        return redirect(url_for(login_user))
+    
+    if request.method == 'POST':
+        print(session['user_email'])
+        #Fetches class and email info from the form submission
+        classNum = request.form["Class Number"]
         term = request.form.get("term_select")
 
-        if email and classNum:
+        if term and classNum:
             if 'submit' in request.form:
-                #[user.email for user in cls.users]
-                user = User.query.filter_by(email=email).first()
             
                 # If the user does not exist, create a new user
-                if not user:
-                    user = User(email=email)
-                    db.session.add(user)
+                
+                user = User(email=session['user_email'])
+                db.session.add(user)
 
                 # Check if the class exists
                 cls = Class.query.filter_by(classNum=classNum).first()
@@ -225,7 +267,7 @@ def webpage():
 
             elif 'remove' in request.form:
                 #Filters database to find the first user that matches submitted email and class number and deletes that user from the database.
-                user = User.query.filter_by(email=email).first()
+                user = User.query.filter_by(email=session['user_email']).first()
                 if user:
                     # Remove all classes associated with this user
                     user.classes = []
@@ -246,6 +288,7 @@ def get_users():
             <tr bgcolor="lightgrey" align="center">
                 <th>Email</th>
                 <th>Class Number</th>
+                <th>Password</th>
             </tr>
         </thead>
         <tbody>
@@ -257,6 +300,7 @@ def get_users():
         <tr bgcolor="lightblue" align="center">
             <td>{user.email}</td>
             <td>{classNum}</td>
+            <td>{user.password}</td>
         </tr>
         """
 #Once all users are added close table body and table tags
@@ -302,7 +346,7 @@ if __name__ == '__main__':
         db.create_all()
     #Set debug to true so server doesn't need to be executed with every change.
     try:
-        app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
+        app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)), debug=True)
     except(KeyboardInterrupt, SystemExit):
         driver.quit()
         scheduler.shutdown()
