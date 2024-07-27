@@ -365,6 +365,7 @@ if __name__ == '__main__':
         db.create_all()
     #Set debug to true so server doesn't need to be executed with every change.
     try:
-        app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)), debug=True)
+        # host='0.0.0.0', port=int(os.environ.get("PORT", 8080)), debug=True
+        app.run()
     except(KeyboardInterrupt, SystemExit):
         scheduler.shutdown()
