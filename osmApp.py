@@ -205,6 +205,11 @@ def login_user():
 
     return render_template('login.html') 
 
+@app.route('/logout')
+def logout():
+    session.pop('user_email', None)
+    return redirect(url_for('login_user'))
+
 #Root route to ask user to register or login if they already have an account
 @app.route('/register', methods=['GET', 'POST'])
 def registration():   
@@ -224,7 +229,6 @@ def registration():
             new_user = User(email=email, password=password_hash)
             db.session.add(new_user)
             db.session.commit()
-            print("User registered")
 
             #url_for is the function name while render_template is the html file name
             return redirect(url_for('login_user'))
@@ -234,47 +238,52 @@ def registration():
 @app.route('/monitor', methods=['GET', 'POST'])
 def webpage():
     if 'user_email' not in session:
-        return redirect(url_for(login_user))
+        return redirect(url_for('login_user'))
     
+    user = User.query.filter_by(email=session['user_email']).first()
+
+    #Gets user classes if user exist else create empty list
+    user_classes = user.classes if user else []
+
     if request.method == 'POST':
-        print(session['user_email'])
+
         #Fetches class and email info from the form submission
         classNum = request.form["Class Number"]
         term = request.form.get("term_select")
+        
+        if request.form.get('submit') and term and classNum:
 
-        if term and classNum:
-            if 'submit' in request.form:
-            
-                # If the user does not exist, create a new user
-                
-                user = User(email=session['user_email'])
-                db.session.add(user)
-
-                # Check if the class exists
+            # Check if the class exists
+            with db.session.no_autoflush:
                 cls = Class.query.filter_by(classNum=classNum).first()
-                
-                # If the class does not exist, create a new class
-                if not cls:
-                    cls = Class(classNum=classNum, term=term, initialSeats=None)
-                    db.session.add(cls)
+            
+            # If the class does not exist, create a new class
+            if not cls:
+                cls = Class(classNum=classNum, term=term, initialSeats=None)
+                db.session.add(cls)
 
-                # Add the class to the user if not already added
-                if cls not in user.classes:
-                    user.classes.append(cls)
+            # Add the class to the user if not already added
+            if cls not in user.classes:
+                user.classes.append(cls)
 
-                # Commit the changes
-                db.session.commit()
+            # Commit the changes
+            db.session.commit()
 
-            elif 'remove' in request.form:
-                #Filters database to find the first user that matches submitted email and class number and deletes that user from the database.
-                user = User.query.filter_by(email=session['user_email']).first()
-                if user:
-                    # Remove all classes associated with this user
-                    user.classes = []
-                    db.session.delete(user)
-                    db.session.commit()
+        elif request.form.get('remove') and classNum:
+
+            with db.session.no_autoflush:
+                remove_cls = Class.query.filter_by(classNum=classNum).first()
+
+            # Remove all classes associated with this user
+            if remove_cls in user.classes:
+                user.classes.remove(remove_cls)
+                #If there are no emails associated with the class delete from db
+                if remove_cls.users.count() == 0:
+                    db.session.delete(remove_cls)
+
+            db.session.commit()
     #Responds with the same html containing the form for more user submissions.
-    return render_template('index.html')
+    return render_template('index.html', user=user, user_classes=user_classes)
 
 #Route to view users and classes being monitored        
 @app.route('/users', methods=['GET'])

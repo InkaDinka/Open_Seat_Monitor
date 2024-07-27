@@ -5,13 +5,13 @@ body {
     font-family: sans-serif;
     line-height: 1.5;
     min-height: 100vh;
-    background: #5c5c5c;
+    background: #252525;
     flex-direction: column;
     margin: 0;
 }
 
 .main {
-    background-color: #5c5c5c;
+    background-color: #444444;
     border-radius: 15px;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
     padding: 10px 20px;
