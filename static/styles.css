@@ -80,7 +80,24 @@ body {
     justify-content: center;
 }
 .form {
-    margin: 20px 200px
+    margin: 55px 75px
+}
+.table_position {
+    position: absolute;
+    top: 275px; right: 100px;
+}
+table {
+    border-collapse: collapse;
+}
+th {
+    padding: 10px;
+    border: 1px solid black;
+}
+td {
+    color: lightgray;
+    background-color: #383838;
+    border: 1px solid black;
+    padding: 8px
 }
 input {
     border: 1px solid transparent;
@@ -90,12 +107,12 @@ input {
 /* color sets the color of input */
 input[type="text"] {
     background-color: #5c5c5c;
-    width: 100%;
+    width: 35%;
     color: lightgray;
 }
 input[type="email"] {
     background-color: #5c5c5c;
-    width: 100%;
+    width: 35%;
     color: lightgray;
 }
 /* Changes color of text in inputs */
