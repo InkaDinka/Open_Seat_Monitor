@@ -53,10 +53,12 @@ class Class(db.Model):
 
 def monitor():
 
-    start_time = time.time()
     chrome_options = Options()
     chrome_options.add_argument('--headless')
     chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--disable-extensions")
     chrome_options.add_argument('--log-level=3')
 
     driver = webdriver.Chrome(options=chrome_options)
@@ -365,7 +367,6 @@ if __name__ == '__main__':
         db.create_all()
     #Set debug to true so server doesn't need to be executed with every change.
     try:
-        # host='0.0.0.0', port=int(os.environ.get("PORT", 8080)), debug=True
-        app.run()
+        app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
     except(KeyboardInterrupt, SystemExit):
         scheduler.shutdown()

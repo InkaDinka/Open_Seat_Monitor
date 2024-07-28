@@ -13,7 +13,7 @@ services:
     volumes: 
       - .:/app
 #Command to run when running docker image.
-    command: gunicorn -w 4 -b 0.0.0.0:8080 osmApp:app
+    command: python osmApp.py
 #Maps port to flask app.
     ports:
       - 8080:8080

@@ -25,5 +25,3 @@ RUN pip install -r requirements.txt
 
 #Copies all files in the current directory to the working directory of the container.
 COPY . .
-
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:8080", "osmApp:app"]
