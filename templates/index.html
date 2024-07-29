@@ -18,6 +18,7 @@
                 <li><a href="https://www.ratemyprofessors.com/" target="_blank" class="nav-item">Rate My Professor</a></li>
                 <li><a href="https://catalog.apps.asu.edu/catalog/classes" target="_blank" class="nav-item">Course Search</a></li>
                 <li><a href=" {{url_for('logout')}}" target="_blank" class="nav-item">Log Out</a></li>
+                <li><a href=" {{url_for('delete_account')}}" target="_blank" class="nav-item">Delete Account</a></li>
             </ul>
         </nav>
 
@@ -31,18 +32,20 @@
             Up to 3 courses can be monitored per user.
         </p>
 
-        <div class="formatform">
+        <div class="formatform" align="center">
             <form class="form" method="POST">
+          
                 <div>
                     <h3 class="submissionheader">Submit a Class</h3>
                         <input type="text" id="Class Number" name="Class Number" placeholder="Class Number">
                 </div>
+           
 
                 <br>
 
                 <div>
                     <label class="labels" for="term">Term:</label>
-                    <select class="select" name="term_select">
+                    <select class="select" name="term_select" style="width: 15%;">
                         <option value="Fall 2024">Fall 2024</option>
                         <option value="Spring 2025">Spring 2025</option>
                         <option value="Summer 2025">Summer 2025</option>
@@ -60,7 +63,7 @@
                     <input type="submit" name="submit">
                 </div>
             </form>
-
+            <br>
             <form class="form" method="POST">
                 <div>
                     <h3 class="submissionheader">Remove a Class</h3>
@@ -76,9 +79,11 @@
             </form>
         </div>
 
-        <div class="table_position">
+        <br>
+
+        <div align="center">
             <h3 style="color: #c0c0c0;">Your Classes</h2>
-                <table class="table" width="1000">
+                <table width="80%">
                     <thead>
                         <tr style="border: 1px solid black;" bgcolor="#5c5c5c" align="center">
                             <th>Class Number</th>

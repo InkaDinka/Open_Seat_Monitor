@@ -217,6 +217,22 @@ def logout():
     session.pop('user_email', None)
     return redirect(url_for('login_user'))
 
+@app.route('/delete')
+def delete_account():
+
+    user = User.query.filter_by(email=session["user_email"]).first()
+
+    for cls in user.classes:
+        user.classes.remove(cls)
+        if cls.users.count() == 0:
+            db.session.delete(cls)
+
+    db.session.delete(user)
+    session.pop('user_email', None)
+    db.session.commit()
+
+    return redirect(url_for('login_user'))
+
 #Root route to ask user to register or login if they already have an account
 @app.route('/register', methods=['GET', 'POST'])
 def registration():   

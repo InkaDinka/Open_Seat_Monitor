@@ -28,9 +28,10 @@ body {
 }
 /* Style for term label in submission form */
 .labels {
-    padding: 15px;
+    padding: 10px;
     color: #c0c0c0;
     font: 18px Arial;
+    width: 100%;
 }
 /* Navigation bar */
 .navbar {
@@ -75,16 +76,17 @@ body {
     transition: color 1s ease,
     background-color 1s ease
 }
+
 .formatform {
     display: inline;
     justify-content: center;
 }
 .form {
-    margin: 55px 75px
+    margin: 30px 30px
 }
 .table_position {
     position: absolute;
-    top: 275px; right: 100px;
+    top: 30%; left: 40%;
 }
 table {
     border-collapse: collapse;
@@ -103,13 +105,15 @@ input {
     border: 1px solid transparent;
     padding: 10px;
     font-size: 16px;
+    width: 25%;
 }
 /* color sets the color of input */
 input[type="text"] {
     background-color: #5c5c5c;
-    width: 35%;
+    width: 50%;
     color: lightgray;
 }
+
 input[type="email"] {
     background-color: #5c5c5c;
     width: 35%;
