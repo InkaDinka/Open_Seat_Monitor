@@ -16,6 +16,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 import os
 import re
+# import chromedriver_binary  # Adds chromedriver binary to path
 
 load_dotenv()
 
@@ -340,10 +341,10 @@ def get_users():
         for user in users:
             classNum = ', '.join(str(cls.classNum) for cls in user.classes)
             user_table += f"""
-            <tr bgcolor="lightblue" align="center">
-                <td>{user.email}</td>
-                <td>{classNum}</td>
-                <td>{user.password}</td>
+            <tr style="border: 1px solid black;" bgcolor="lightblue" align="center">
+                <td class="td">{user.email}</td>
+                <td class="td">{classNum}</td>
+                <td class="td">{user.password}</td>
             </tr>
             """
 
@@ -354,11 +355,11 @@ def get_users():
                 db.session.commit()
             else:
                 class_table += f"""
-                <br><tr bgcolor="lightblue" align="center">
-                    <td>{cls.classNum}</td>
-                    <td>{cls.initialSeats}</td>
-                    <td>{associated_emails}</td>
-                    <td>{cls.term}</td>
+                <tr style="border: 1px solid black;" bgcolor="lightblue" align="center">
+                    <td class="td">{cls.classNum}</td>
+                    <td class="td">{cls.initialSeats}</td>
+                    <td class="td">{associated_emails}</td>
+                    <td class="td">{cls.term}</td>
                 </tr>
                 """
 

@@ -43,5 +43,3 @@ services:
 # 6. Created a service with the image in the osmregistry artifact registry and deployed.
 
 #Remove all images: docker rmi $(docker images -q)
-
-#/user path new secret name: lilberrie

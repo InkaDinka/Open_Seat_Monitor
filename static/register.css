@@ -73,9 +73,10 @@ button {
 }
 
 .paragraph {
-    padding: 5px 10px;
+    text-align: center;
     color: #c0c0c0;
     line-height: 2;
+    padding: 0% 10%;
 }
 
 .header {
