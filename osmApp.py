@@ -56,9 +56,11 @@ def monitor():
     chrome_options = Options()
     chrome_options.add_argument('--headless')
     chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument("window-size=1024,768")
+    chrome_options.add_argument("enable-automation")
     chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--dns-prefetch-disable")
     chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--disable-extensions")
     chrome_options.add_argument('--log-level=3')
 
     driver = webdriver.Chrome(options=chrome_options)
@@ -132,24 +134,24 @@ def monitor():
         for cls in classes:
             receiver_emails = [user.email for user in cls.users]
             classNum = int(cls.classNum)
-            if cls.initialSeats == None:
-                #Grabs initial seats to monitor.
-                cls.initialSeats, _ = get_page_content(classNum, term_dict.get(cls.term), driver)
-                #Commits initial seats to databasae.
-                session.commit()
 
             #Searches current seats that will be compared to the inital seats of current user.
             current_seats, class_name = get_page_content(classNum, term_dict.get(cls.term), driver)
+
+            if cls.initialSeats == None:
+                #Grabs initial seats to monitor.
+                cls.initialSeats = current_seats
+                #Commits initial seats to databasae.
+                session.commit()
 
             if current_seats == None or class_name == None:
                 print(f"Class {cls.classNum} not found\n")
                 continue
 
-            # print(f"Class Name: {class_name}   -   Email: {user.email}   -   Class Number: {user.classNum}   -   Initial Seats: {user.initialSeats}   -   Term: {user.term}\n")
-
             #Checks for changes in the seats available and if there's a change an email is sent.
             if int(current_seats) != int(cls.initialSeats):
                 email_users(receiver_emails, class_name, current_seats)
+
                 #Updates the initial seats to current seats in the database.
                 cls.initialSeats = int(current_seats)
 
@@ -191,7 +193,7 @@ def email_users(reciever_emails, class_name, current_seats):
 scheduler = BackgroundScheduler()
                                                     # args=[driver] (for if only one driver is used instead of creating a new one with each function call)
 #Creating a driver for each function call allows for multiple instances. The result is slower function run time but multiple instances of the function being called.
-scheduler.add_job(monitor, 'interval', seconds=30, max_instances=10)
+scheduler.add_job(monitor, 'interval', seconds=45, max_instances=10)
 scheduler.start()
 
 #If user is not registered add them to the database
@@ -285,17 +287,17 @@ def webpage():
                 #Check if the class exists
                 cls = Class.query.filter_by(classNum=classNum).first()
             
-            #If the class does not exist, create a new class
-            if not cls and len(user.classes) < 3:
-                cls = Class(classNum=classNum, term=term, initialSeats=None)
-                db.session.add(cls)
+                #If the class does not exist, create a new class
+                if not cls and len(user.classes) < 2:
+                    cls = Class(classNum=classNum, term=term, initialSeats=None)
+                    db.session.add(cls)
 
-            #Add the class to the user if not already added
-            if cls not in user.classes and len(user.classes) < 3:
-                user.classes.append(cls)
+                #Add the class to the user if not already added
+                if cls not in user.classes and len(user.classes) < 2:
+                    user.classes.append(cls)
 
-            #Commit the changes
-            db.session.commit()
+                #Commit the changes
+                db.session.commit()
 
         elif request.form.get('remove') and classNum:
 
@@ -313,68 +315,56 @@ def webpage():
     #Responds with the same html containing the form for more user submissions.
     return render_template('index.html', user=user, user_classes=user_classes)
 
+@app.route('/adminsignin', methods=['GET', 'POST'])
+def admin_signin():
+    if request.method == 'POST':
+        admin_password = request.form['password']
+
+        if admin_password:
+            session['admin_password'] = admin_password
+            return redirect(url_for('get_users'))
+        
+    return render_template('admin.html')
+
 #Route to view users and classes being monitored        
 @app.route('/users', methods=['GET'])
 def get_users():
-    users = User.query.all()
-    classes = Class.query.all()
 
-    table = """
-    <table bgcolor="grey" width="1000"; border-collapse: collapse;" align="center" >
-        <thead>
-            <tr bgcolor="lightgrey" align="center">
-                <th>Email</th>
-                <th>Class Number</th>
-                <th>Password</th>
+    if session['admin_password'] == os.getenv('ADMIN_PASSWORD'):
+        users = User.query.all()
+        classes = Class.query.all()
+        user_table = ""
+        class_table = ""
+
+
+        for user in users:
+            classNum = ', '.join(str(cls.classNum) for cls in user.classes)
+            user_table += f"""
+            <tr bgcolor="lightblue" align="center">
+                <td>{user.email}</td>
+                <td>{classNum}</td>
+                <td>{user.password}</td>
             </tr>
-        </thead>
-        <tbody>
-    """
+            """
 
-    for user in users:
-        classNum = ', '.join(str(cls.classNum) for cls in user.classes)
-        table += f"""
-        <tr bgcolor="lightblue" align="center">
-            <td>{user.email}</td>
-            <td>{classNum}</td>
-            <td>{user.password}</td>
-        </tr>
-        """
-#Once all users are added close table body and table tags
-    table += """
-        </tbody>
-    </table>
-    """
+        for cls in classes:
+            associated_emails = cls.users.count()
+            if associated_emails == 0:
+                db.session.delete(cls)
+                db.session.commit()
+            else:
+                class_table += f"""
+                <br><tr bgcolor="lightblue" align="center">
+                    <td>{cls.classNum}</td>
+                    <td>{cls.initialSeats}</td>
+                    <td>{associated_emails}</td>
+                    <td>{cls.term}</td>
+                </tr>
+                """
 
-    table += """
-    <table bgcolor="grey" width="1000"; border-collapse: collapse;" align="center" >
-        <thead>
-            <tr bgcolor="lightgrey" align="center">
-                <th>Class Number</th>
-                <th>Initial Seats</th>
-                <th>Associated Emails</th>
-                <th>Term</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
-
-    for cls in classes:
-        associated_emails = cls.users.count()
-        table += f"""
-        <br><tr bgcolor="lightblue" align="center">
-            <td>{cls.classNum}</td>
-            <td>{cls.initialSeats}</td>
-            <td>{associated_emails}</td>
-            <td>{cls.term}</td>
-        </tr>
-        """
-    #Once all users are added close table body and table tags
-    table += """
-        </tbody>
-    </table>
-    """
-    return Response(table, content_type='text/html')
+        return render_template('admin_table.html', class_table=class_table, user_table=user_table)
+    return redirect(url_for('admin_signin'))
+    #return Response(table, content_type='text/html')
 
 if __name__ == '__main__':
     #Creates instance of database in current flask context. 

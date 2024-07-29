@@ -71,3 +71,15 @@ button {
     justify-content: center;
     align-items: center;
 }
+
+.paragraph {
+    padding: 5px 10px;
+    color: #c0c0c0;
+    line-height: 2;
+}
+
+.header {
+    
+    color: #c0c0c0;
+    margin: 0;
+}

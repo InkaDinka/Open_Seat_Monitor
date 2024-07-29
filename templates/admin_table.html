@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Table</title>
+</head>
+<body>
+    <table bgcolor="grey" width="1000"; border-collapse: collapse;" align="center" >
+        <thead>
+            <tr bgcolor="lightgrey" align="center">
+                <th>Email</th>
+                <th>Class Number</th>
+                <th>Password</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{ user_table|safe }}
+
+        </tbody>
+
+    <table bgcolor="grey" width="1000"; border-collapse: collapse;" align="center" >
+        <thead>
+            <tr bgcolor="lightgrey" align="center">
+                <th>Class Number</th>
+                <th>Initial Seats</th>
+                <th>Associated Emails</th>
+                <th>Term</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{ class_table|safe }}
+        </tbody>
+    </table>
+
+    <div>
+        <a href="{{ url_for('admin_signin') }}">Logout</a>
+    </div>
+</body>
+</html>
