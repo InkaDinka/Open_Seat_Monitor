@@ -55,7 +55,7 @@ class Class(db.Model):
 def monitor():
 
     chrome_options = Options()
-    chrome_options.add_argument('--headless')
+    chrome_options.add_argument('--headless=new')
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument("window-size=1024,768")
     chrome_options.add_argument("enable-automation")
@@ -200,20 +200,27 @@ scheduler.start()
 #If user is not registered add them to the database
 @app.route('/', methods=['GET', 'POST'])
 def login_user():
-
+    user_authenticated = None
     if request.method == 'POST':
         email = request.form["email"]
         password = request.form["password"]
-
+    
         if email and password:
+
             user_authenticate = User.query.filter_by(email=email).first()
+
             #Cross checks hashed password and password entered in the form.
             if user_authenticate and check_password_hash(user_authenticate.password, password):
+                user_authenticated = True
+
                 #Stores users email in session to be used when adding classes associated with that email.
                 session['user_email'] = email
                 return redirect(url_for('webpage'))
+            else:
+                user_authenticated = False
+                return render_template('login.html', user_authenticated=user_authenticated)
 
-    return render_template('login.html') 
+    return render_template('login.html', user_authenticated=user_authenticated) 
 
 @app.route('/logout')
 def logout():
@@ -225,20 +232,31 @@ def delete_account():
 
     user = User.query.filter_by(email=session["user_email"]).first()
 
-    for cls in user.classes:
-        user.classes.remove(cls)
-        if cls.users.count() == 0:
-            db.session.delete(cls)
+    if user:
+        for cls in user.classes:
+            user.classes.remove(cls)
+            if cls.users.count() == 0:
+                db.session.delete(cls)
 
-    db.session.delete(user)
-    session.pop('user_email', None)
-    db.session.commit()
+        db.session.delete(user)
+        session.pop('user_email', None)
+        db.session.commit()
 
-    return redirect(url_for('login_user'))
+        user_deleted = True
+        return redirect(url_for('registration', user_deleted=user_deleted))
+        
+
 
 #Root route to ask user to register or login if they already have an account
 @app.route('/register', methods=['GET', 'POST'])
-def registration():   
+def registration():
+
+    if request.method == 'GET':
+        user_deleted = request.args.get('user_deleted')
+        if user_deleted:
+            return render_template('register.html', user_exists=False, user_deleted=True)
+        return render_template('register.html', user_exists=False, user_deleted=False)
+
     if request.method == 'POST':
         #Gathers email and password from form data in POST request.
         email = request.form["email"]
@@ -260,8 +278,22 @@ def registration():
 
             #url_for is the function name while render_template is the html file name
             return redirect(url_for('login_user'))
-  
-    return render_template('register.html', user_exists=False)
+
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+
+    if request.method == 'POST':
+        user = User.query.filter_by(email=request.form['email']).first()
+
+        if user:
+            session['user_email'] = request.form['email']
+            return redirect(url_for('delete_account'))
+        
+        else:
+            no_user = True
+            return render_template('forgot.html', no_user=no_user)
+    
+    return render_template('forgot.html')
 
 #Root route that gets information from the submitted form and creates new users in the sql database.
 @app.route('/monitor', methods=['GET', 'POST'])

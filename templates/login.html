@@ -4,8 +4,10 @@
 <head>
       <title>ASU Open Seat Monitor</title>
       <link rel="stylesheet" href="/static/register.css">
+
       <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2680770269441635"
      crossorigin="anonymous"></script>
+     
 </head>
 
 <body>
@@ -14,8 +16,8 @@
             <p class="paragraph">
                   Open Seat Monitor solves the problem of needing to continuously check ASU's class search when class registration opens and seats get filled within a matter of minutes.
                   Submit a valid email that you are willing to recieve notifications from and you can add a class to be monitored by submitting the class term and class number. 
-                  Your monitored courses will be displayed when you register and log in and you will be emailed when a seat is available. 
-                  Up to 2 courses can be monitored per user. This site is free and uses ads to keep running so clicking the ads would be much appreciated. 
+                  Your monitored courses will be displayed when you sign in and you will be emailed when a seat is available. 
+                  Up to 2 courses can be monitored per user. 
             </p>
       </div><br>
       <div class="main">
@@ -44,7 +46,18 @@
                               Submit
                         </button>
                   </div>
+                  {% if user_authenticated == False %}
+                  <p style="color: rgb(207, 81, 81);">
+                        Email or Password is Incorrect
+                  </p>
+                  {% endif %}
             </form>
+
+            <a style="color: rgb(150, 150, 150);" href="{{ url_for('forgot_password') }}"
+                  style="text-decoration: none;">
+                  Forgot Passord
+            </a>
+
             <p style="color: lightgray;">Not registered?
                   <a style="color: rgb(150, 150, 150);" href="{{ url_for('registration') }}"
                      style="text-decoration: none;">
