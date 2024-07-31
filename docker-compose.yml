@@ -9,6 +9,8 @@ services:
     environment:
       - MASS_EMAIL=${MASS_EMAIL}
       - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - APP_SECRET=${APP_SECRET}
 #Maps current directory to /app in docker file container.
     volumes: 
       - .:/app
@@ -17,29 +19,3 @@ services:
 #Maps port to flask app.
     ports:
       - 8080:8080
-
-
-
-#To see all current images:
-#docker image ls
-
-#To see all containers:
-#docker ps -a
-
-#Tag images with locations to push to google cloud:
-
-#docker tag openseatmonitordeploy-background:latest gcr.io/openseatmonitor/openseatmonitordeploy-background:latest
-#docker tag openseatmonitordeploy-web:latest gcr.io/openseatmonitor/openseatmonitordeploy-web:latest
-
-#Push image to google cloud artifact registry
-#docker push gcr.io/openseatmonitor/openseatmonitordeploy-background:latest
-
-#GOOGLE CLOUD SHELL DEPLOYMENT
-# 1. Created a artifact repository name osmregistry
-# 2. ran "docker build -t osm ." to create an image called osm
-# 3. Tested image with "docker run --rm -p 8080:8080 -e PORT=8080 osm"
-# 4. tagged image to repository with "docker tag osm:latest us-central1-docker.pkg.dev/openseatmonitor/osmregistry/osm:latest"
-# 5. Pushed tagged image to repository with "docker push us-central1-docker.pkg.dev/openseatmonitor/osmregistry/osm:latest"
-# 6. Created a service with the image in the osmregistry artifact registry and deployed.
-
-#Remove all images: docker rmi $(docker images -q)

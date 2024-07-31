@@ -21,7 +21,7 @@ import re
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = "jf43jhfd9hf3u9hd93"
+app.secret_key = os.getenv('APP_SECRET')
 
 #Creates a instance of the database in the working directory.
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.sqlite3'
