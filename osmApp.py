@@ -229,19 +229,23 @@ def logout():
 
 @app.route('/delete')
 def delete_account():
-
+    #Get user in session
     user = User.query.filter_by(email=session["user_email"]).first()
 
+    #If the user to be deleted is found remove each class associated with the user and remove 
+    #the class from the db if no emails are associated with the class
     if user:
         for cls in user.classes:
             user.classes.remove(cls)
             if cls.users.count() == 0:
                 db.session.delete(cls)
 
+    #Delete user and remove user from session
         db.session.delete(user)
         session.pop('user_email', None)
         db.session.commit()
 
+    #Set user_deleted to true to display the user deleted text on the webpage.
         user_deleted = True
         return redirect(url_for('registration', user_deleted=user_deleted))
         
@@ -252,7 +256,9 @@ def delete_account():
 def registration():
 
     if request.method == 'GET':
+
         user_deleted = request.args.get('user_deleted')
+        #Displays registration with user deleted display message so the user can make another account if needed.
         if user_deleted:
             return render_template('register.html', user_exists=False, user_deleted=True)
         return render_template('register.html', user_exists=False, user_deleted=False)
@@ -284,7 +290,7 @@ def forgot_password():
 
     if request.method == 'POST':
         user = User.query.filter_by(email=request.form['email']).first()
-
+        #If the user forgot their password they can delete their account so they can make a new one with the same email.
         if user:
             session['user_email'] = request.form['email']
             return redirect(url_for('delete_account'))
@@ -352,7 +358,6 @@ def webpage():
 def admin_signin():
     if request.method == 'POST':
         admin_password = request.form['password']
-
         if admin_password:
             session['admin_password'] = admin_password
             return redirect(url_for('get_users'))
@@ -362,14 +367,14 @@ def admin_signin():
 #Route to view users and classes being monitored        
 @app.route('/users', methods=['GET'])
 def get_users():
-
+    #Compares password from form with the environment variable for viewing users.
     if session['admin_password'] == os.getenv('ADMIN_PASSWORD'):
         users = User.query.all()
         classes = Class.query.all()
         user_table = ""
         class_table = ""
 
-
+        #Dynamically builds table by concatenating each user and class to a row in a table to be passed to admin_table.html
         for user in users:
             classNum = ', '.join(str(cls.classNum) for cls in user.classes)
             user_table += f"""
@@ -380,6 +385,7 @@ def get_users():
             </tr>
             """
 
+        #Checks for classes not associated with any user emails.
         for cls in classes:
             associated_emails = cls.users.count()
             if associated_emails == 0:
