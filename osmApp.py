@@ -194,7 +194,7 @@ def email_users(reciever_emails, class_name, current_seats):
 scheduler = BackgroundScheduler()
                                                     # args=[driver] (for if only one driver is used instead of creating a new one with each function call)
 #Creating a driver for each function call allows for multiple instances. The result is slower function run time but multiple instances of the function being called.
-scheduler.add_job(monitor, 'interval', seconds=45, max_instances=10)
+scheduler.add_job(monitor, 'interval', seconds=18, max_instances=10)
 scheduler.start()
 
 #If user is not registered add them to the database
