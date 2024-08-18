@@ -11,7 +11,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
-from flask import Flask, render_template, request, Response, redirect, url_for, session
+from flask import Flask, render_template, request, Response, redirect, url_for, session, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 import os
@@ -404,6 +404,10 @@ def get_users():
         return render_template('admin_table.html', class_table=class_table, user_table=user_table)
     return redirect(url_for('admin_signin'))
     #return Response(table, content_type='text/html')
+
+@app.route('/robots.txt')
+def robots_txt():
+    return send_from_directory(app.root_path, 'robots.txt')
 
 if __name__ == '__main__':
     #Creates instance of database in current flask context. 
