@@ -52,19 +52,8 @@ class Class(db.Model):
     initialSeats = db.Column(db.Integer, nullable=True, default=None)
     term = db.Column(db.String(20))
 
-def monitor():
+def monitor(driver):
 
-    chrome_options = Options()
-    chrome_options.add_argument('--headless=new')
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument("window-size=1024,768")
-    chrome_options.add_argument("enable-automation")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--dns-prefetch-disable")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument('--log-level=3')
-
-    driver = webdriver.Chrome(options=chrome_options)
     #Function that takes a chrome driver and form submission info from sqlite database for unique class search link for monitoring.
     def get_page_content(classNum, term, driver):
 
@@ -76,7 +65,7 @@ def monitor():
         
         try:
             # Gives driver wait time for elements on webpage to be found and for page to load
-            driver.implicitly_wait(1)
+            driver.implicitly_wait(10)
             
             #Finds elements under a tree of html tags and puts all elements under that tree in a list
             elements = driver.find_elements(By.XPATH, f"/html/body/div[2]/div[2]/div[2]/div/div/div[5]/div/div/div/div[2]")
@@ -159,7 +148,6 @@ def monitor():
         #Changes will be applied to the database.
         session.commit()
         session.close()
-        driver.quit()
         #Decreases CPU usage from APScheduler
 
 
@@ -192,9 +180,21 @@ def email_users(reciever_emails, class_name, current_seats):
 
 #Adds background process for monitoring classes where the function is called at an interval.
 scheduler = BackgroundScheduler()
+
+chrome_options = Options()
+chrome_options.add_argument('--headless=new')
+chrome_options.add_argument('--no-sandbox')
+chrome_options.add_argument("window-size=1024,768")
+chrome_options.add_argument("enable-automation")
+chrome_options.add_argument("--disable-dev-shm-usage")
+chrome_options.add_argument("--dns-prefetch-disable")
+chrome_options.add_argument("--disable-gpu")
+chrome_options.add_argument('--log-level=3')
+
+driver = webdriver.Chrome(options=chrome_options)
                                                     # args=[driver] (for if only one driver is used instead of creating a new one with each function call)
 #Creating a driver for each function call allows for multiple instances. The result is slower function run time but multiple instances of the function being called.
-scheduler.add_job(monitor, 'interval', seconds=18, max_instances=10)
+scheduler.add_job(monitor, 'interval', seconds=10, args=[driver])
 scheduler.start()
 
 #If user is not registered add them to the database
@@ -415,3 +415,4 @@ if __name__ == '__main__':
         app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
     except(KeyboardInterrupt, SystemExit):
         scheduler.shutdown()
+        driver.quit()
