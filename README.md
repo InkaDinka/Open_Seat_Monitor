@@ -5,4 +5,5 @@ In your environment you can run the following docker commands with the environme
 1. docker build -t osm .
 
 2. PORT={port} MASS_EMAIL={optional} EMAIL_PASSWORD={optional} ADMIN_PASSWORD={optional} APP_SECRET={random_secret} docker compose up
+
    (APP_SECRET can contain any letters or numbers) 
