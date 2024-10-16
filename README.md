@@ -4,3 +4,10 @@ Open Seat Monitor is a full-stack web application that monitors classes for open
 2. The App Password
 3. A random password for the App Secret used for the Flask Server
 4. Port number
+
+Or, in your environment you can run the following docker commands with the environment variables listed above to run the application:
+
+docker build -t osm .
+
+docker run --rm -p 8080:8080 -e PORT=8080 osm
+(add more -e flags for the environment variables)
