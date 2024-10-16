@@ -1,5 +1,5 @@
 #Declares language version
-FROM python:3
+FROM python:3.12
 
 #Logs outputs. Useful for debugging
 ENV PYTHONUNBUFFERED 1
@@ -9,6 +9,8 @@ ENV PYTHONDONTWRITEBYTECODE 1
 
 #Run commands needed to create chrome instances so chrome.exe is not needed in working directory. 
 RUN apt-get update
+
+RUN apt-get update && apt-get install -y libsdl2-dev
 
 RUN apt-get install -y chromium
 
