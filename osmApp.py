@@ -194,7 +194,7 @@ chrome_options.add_argument('--log-level=3')
 driver = webdriver.Chrome(options=chrome_options)
                                                     # args=[driver] (for if only one driver is used instead of creating a new one with each function call)
 #Creating a driver for each function call allows for multiple instances. The result is slower function run time but multiple instances of the function being called.
-scheduler.add_job(monitor, 'interval', seconds=10, args=[driver])
+scheduler.add_job(monitor, 'interval', seconds=15, args=[driver])
 scheduler.start()
 
 #If user is not registered add them to the database
