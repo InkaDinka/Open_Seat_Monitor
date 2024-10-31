@@ -86,7 +86,12 @@ def monitor(driver):
             #Scans for bold-hypherlink tag to find class name
             waits = WebDriverWait(driver, 30)
             span_elements = waits.until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'bold-hyperlink')))
-            class_name = span_elements[2].text
+            class_name = ""
+            for i in range(len(span_elements) - 1):
+                if span_elements[i].text != "":
+                    class_name = span_elements[i].text + " " + span_elements[i + 1].text
+                    break
+           
 
         except Exception as e:
             print(f"Retrying... {e}")
@@ -105,7 +110,6 @@ def monitor(driver):
     with app.app_context():
         session = db.session()
         term_dict = {
-            "Fall 2024": 2247,
             "Spring 2025": 2251,
             "Summer 2025": 2254,
             "Fall 2025": 2257,
